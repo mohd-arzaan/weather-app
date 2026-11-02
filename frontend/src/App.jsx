@@ -75,7 +75,6 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Reusable function jo weather aur forecast dono fetch karta hai
   const fetchWeatherData = async (query) => {
     setLoading(true);
     setError('');
@@ -84,9 +83,10 @@ function App() {
 
     try {
       const q = encodeURIComponent(query);
+      // CHANGE: URL updated to Render
       const [weatherRes, forecastRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/weather?city=${q}`),
-        axios.get(`http://localhost:5000/api/forecast?city=${q}`).catch(() => null),
+        axios.get(`https://weather-app-w6k0.onrender.com/api/weather?city=${q}`),
+        axios.get(`https://weather-app-w6k0.onrender.com/api/forecast?city=${q}`).catch(() => null),
       ]);
 
       setWeather(weatherRes.data);
@@ -118,7 +118,6 @@ function App() {
     fetchWeatherData(query);
   };
 
-  // GEOLOCATION FUNCTION
   const fetchByLocation = () => {
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser.');
@@ -132,12 +131,12 @@ function App() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          // Backend se city ka naam nikaalo
-          const locationRes = await axios.get(`http://localhost:5000/api/location?lat=${latitude}&lon=${longitude}`);
+          // CHANGE: URL updated to Render
+          const locationRes = await axios.get(`https://weather-app-w6k0.onrender.com/api/location?lat=${latitude}&lon=${longitude}`);
           const cityName = locationRes.data.city;
           
-          setCity(cityName); // Search bar mein auto-fill karo
-          await fetchWeatherData(cityName); // Us city ka weather fetch karo
+          setCity(cityName);
+          await fetchWeatherData(cityName);
         } catch (err) {
           setError('Could not fetch weather for your location.');
           setLoading(false);
@@ -175,7 +174,6 @@ function App() {
 
       <div className="relative z-10 flex flex-col min-h-screen max-w-5xl mx-auto w-full px-6 sm:px-10 py-6">
         
-        {/* Form updated with Location Button */}
         <form onSubmit={fetchWeather} className="flex items-end gap-3 w-full max-w-md">
           <input
             type="text"
