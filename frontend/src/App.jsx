@@ -1,6 +1,98 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Search, Cloud, Droplets, Wind, MapPin, Loader2, Sun, CloudRain, CloudLightning } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+
+/*
+  Design idea: the whole screen is a flat colour-block poster.
+  Each weather condition gets its own solid colour, ink colour and one bold
+  geometric shape (sun = circle, rain = striped arch, thunder = bolt, etc).
+  No cards, no gradients, no glass. The temperature is the hero.
+*/
+const THEMES = {
+  idle:         { bg: '#EDEDED', ink: '#000000', accent: '#000000', shape: 'ring' },
+  Clear:        { bg: '#FFC933', ink: '#000000', accent: '#FF5A36', shape: 'sun' },
+  Clouds:       { bg: '#AFC3D6', ink: '#000000', accent: '#F5F8FB', shape: 'clouds' },
+  Rain:         { bg: '#7FB2FF', ink: '#000000', accent: '#1E4BD6', shape: 'rain' },
+  Thunderstorm: { bg: '#B79CFF', ink: '#000000', accent: '#FFE14D', shape: 'bolt' },
+  Snow:         { bg: '#DCEBF2', ink: '#000000', accent: '#6FB3E0', shape: 'snow' },
+  Mist:         { bg: '#B9B4A8', ink: '#000000', accent: '#E8E4D8', shape: 'mist' },
+};
+THEMES.Drizzle = THEMES.Rain;
+['Haze', 'Fog', 'Smoke', 'Dust', 'Sand', 'Ash'].forEach((k) => (THEMES[k] = THEMES.Mist));
+
+function Shape({ kind, accent }) {
+  const fill = { width: '100%', height: '100%' };
+
+  if (kind === 'sun') {
+    return <div style={{ ...fill, borderRadius: '50%', background: accent }} />;
+  }
+  if (kind === 'clouds') {
+    const blob = (style) => <div style={{ position: 'absolute', borderRadius: '50%', background: accent, ...style }} />;
+    return (
+      <div style={{ ...fill, position: 'relative' }}>
+        {blob({ width: '55%', height: '55%', left: 0, top: '42%' })}
+        {blob({ width: '72%', height: '72%', left: '20%', top: '8%' })}
+        {blob({ width: '50%', height: '50%', left: '50%', top: '48%' })}
+      </div>
+    );
+  }
+  if (kind === 'rain') {
+    return (
+      <div
+        style={{
+          ...fill,
+          borderRadius: '50% 50% 0 0 / 40% 40% 0 0',
+          backgroundImage: `repeating-linear-gradient(110deg, ${accent} 0 10px, transparent 10px 30px)`,
+        }}
+      />
+    );
+  }
+  if (kind === 'bolt') {
+    return (
+      <div
+        style={{
+          ...fill,
+          background: accent,
+          clipPath: 'polygon(55% 0, 15% 55%, 45% 55%, 30% 100%, 85% 38%, 52% 38%)',
+        }}
+      />
+    );
+  }
+  if (kind === 'snow') {
+    return (
+      <div
+        style={{
+          ...fill,
+          borderRadius: '50%',
+          backgroundImage: `radial-gradient(circle, ${accent} 5px, transparent 6px)`,
+          backgroundSize: '36px 36px',
+        }}
+      />
+    );
+  }
+  if (kind === 'mist') {
+    return (
+      <div
+        style={{
+          ...fill,
+          borderRadius: '50%',
+          backgroundImage: `repeating-linear-gradient(0deg, ${accent} 0 12px, transparent 12px 28px)`,
+        }}
+      />
+    );
+  }
+  // idle
+  return <div style={{ ...fill, borderRadius: '50%', border: `12px solid ${accent}`, opacity: 0.9 }} />;
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="border-t-4 border-current pt-3">
+      <p className="text-sm font-semibold opacity-70">{label}</p>
+      <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">{value}</p>
+    </div>
+  );
+}
 
 function App() {
   const [city, setCity] = useState('');
@@ -10,14 +102,17 @@ function App() {
 
   const fetchWeather = async (e) => {
     e.preventDefault();
-    if (!city) return;
+    const query = city.trim();
+    if (!query) return;
 
     setLoading(true);
     setError('');
     setWeather(null);
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/weather?city=${city}`);
+      const response = await axios.get(
+        `http://localhost:5000/api/weather?city=${encodeURIComponent(query)}`
+      );
       setWeather(response.data);
     } catch (err) {
       if (err.response && err.response.status === 404) {
@@ -30,130 +125,119 @@ function App() {
     }
   };
 
-  // Background Logic: Time aur Condition ke hisaab se theme change
-  const getDynamicBackground = () => {
-    if (!weather) return 'bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-600'; // Default
-
-    // City ka local time nikaalo (timezone seconds mein hota hai)
-    const utcTime = new Date().getTime() + (new Date().getTimezoneOffset() * 60000);
-    const cityLocalTime = new Date(utcTime + (weather.timezone * 1000));
-    const hours = cityLocalTime.getHours();
-    const condition = weather.weather[0].main; // Clear, Clouds, Rain, etc.
-
-    // 1. Agar Rain ya Thunderstorm hai
-    if (condition === 'Rain' || condition === 'Drizzle' || condition === 'Thunderstorm') {
-      return 'bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900';
-    }
-
-    // 2. Agar Clouds hain
-    if (condition === 'Clouds') {
-      if (hours >= 6 && hours < 18) return 'bg-gradient-to-br from-gray-400 via-gray-500 to-gray-600';
-      return 'bg-gradient-to-br from-slate-800 via-slate-900 to-black';
-    }
-
-    // 3. Agar Clear sky hai (Time ke hisaab se)
-    if (hours >= 5 && hours < 12) {
-      // Morning
-      return 'bg-gradient-to-br from-orange-300 via-orange-400 to-yellow-500'; 
-    } else if (hours >= 12 && hours < 17) {
-      // Afternoon
-      return 'bg-gradient-to-br from-blue-400 via-sky-500 to-blue-600';
-    } else if (hours >= 17 && hours < 20) {
-      // Evening
-      return 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400';
-    } else {
-      // Night
-      return 'bg-gradient-to-br from-gray-900 via-blue-900 to-slate-900';
-    }
-  };
+  const condition = weather?.weather?.[0]?.main;
+  const t = weather ? THEMES[condition] || THEMES.Clouds : THEMES.idle;
 
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-1000 ease-in-out ${getDynamicBackground()}`}>
-      
-      <div className="w-full max-w-md bg-white/20 backdrop-blur-xl border border-white/30 rounded-3xl shadow-2xl p-6 text-white">
-        
-        <h1 className="text-3xl font-extrabold text-center mb-6 drop-shadow-md">Weather App</h1>
+    <main
+      className="poster relative min-h-screen overflow-hidden transition-colors duration-700"
+      style={{ background: t.bg, color: t.ink }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap');
+        .poster { font-family: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+        .poster input::placeholder { color: currentColor; opacity: .45; }
+        .poster input:focus, .poster input:focus-visible { outline: none; box-shadow: 0 4px 0 0 currentColor; }
+        .poster button:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
+        @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        .rise { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
+        @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+      `}</style>
 
-        <form onSubmit={fetchWeather} className="relative mb-6">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
-            <Search className="w-5 h-5 text-white/70" />
-          </div>
+      {/* Big geometric shape that follows the weather */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-[14vmin] top-[10vh] w-[72vmin] h-[72vmin]"
+      >
+        <Shape kind={t.shape} accent={t.accent} />
+      </div>
+
+      <div className="relative z-10 flex flex-col min-h-screen max-w-6xl mx-auto w-full px-6 sm:px-10 py-8">
+        {/* Search */}
+        <form onSubmit={fetchWeather} className="flex items-end gap-3 w-full max-w-xl">
           <input
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder="Search city..."
-            className="w-full py-3 pl-12 pr-4 bg-white/20 border border-white/30 rounded-2xl text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all text-lg font-medium shadow-inner"
+            placeholder="Type a city"
+            aria-label="City name"
+            className="flex-1 min-w-0 bg-transparent border-b-4 border-current py-2 text-2xl sm:text-3xl font-bold focus:outline-none"
           />
-          <button type="submit" className="hidden">Search</button>
+          <button
+            type="submit"
+            className="px-5 py-3 font-bold text-lg active:scale-95 transition-transform"
+            style={{ background: t.ink, color: t.bg }}
+          >
+            Search
+          </button>
         </form>
 
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-10">
-            <Loader2 className="w-10 h-10 animate-spin text-white/80" />
-            <p className="mt-4 text-white/80 font-medium">Fetching weather...</p>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="bg-red-500/30 border border-red-500/50 rounded-2xl p-4 text-center">
-            <p className="text-white font-medium">{error}</p>
-          </div>
-        )}
-
-        {weather && !loading && (
-          <div className="animate-fade-in">
-            <div className="flex items-center justify-center gap-2 mb-6">
-              <MapPin className="w-6 h-6 text-white/90" />
-              <h2 className="text-2xl font-bold tracking-wide drop-shadow-sm">
-                {weather.name}, {weather.sys.country}
-              </h2>
+        {/* Main area */}
+        <div className="flex-1 flex flex-col justify-center py-10">
+          {loading && (
+            <div className="flex items-center gap-4" role="status">
+              <Loader2 className="w-10 h-10 animate-spin" />
+              <p className="text-3xl font-bold">Fetching weather...</p>
             </div>
+          )}
 
-            <div className="flex flex-col items-center justify-center mb-8">
-              <img
-                src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}@4x.png`}
-                alt="weather icon"
-                className="w-32 h-32 drop-shadow-xl"
-              />
-              <div className="flex items-start">
-                <h3 className="text-6xl font-extrabold drop-shadow-md">{Math.round(weather.main.temp)}</h3>
-                <span className="text-3xl font-bold mt-1">°C</span>
-              </div>
-              <p className="text-xl font-medium capitalize mt-2 text-white/90 drop-shadow-sm">
+          {error && !loading && (
+            <div role="alert">
+              <h1 className="font-extrabold tracking-tight leading-none" style={{ fontSize: 'clamp(3rem, 9vw, 7rem)' }}>
+                No luck.
+              </h1>
+              <p className="mt-4 text-2xl font-semibold max-w-md">{error}</p>
+            </div>
+          )}
+
+          {weather && !loading && (
+            <div>
+              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
+                {weather.name}, {weather.sys.country}
+              </h1>
+              <p className="mt-1 text-xl sm:text-2xl font-semibold capitalize opacity-80">
                 {weather.weather[0].description}
               </p>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div className="bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col items-center shadow-lg">
-                <Droplets className="w-6 h-6 mb-2 text-blue-200" />
-                <p className="text-sm text-white/80">Humidity</p>
-                <p className="text-lg font-bold">{weather.main.humidity}%</p>
-              </div>
-              <div className="bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col items-center shadow-lg">
-                <Wind className="w-6 h-6 mb-2 text-gray-200" />
-                <p className="text-sm text-white/80">Wind Speed</p>
-                <p className="text-lg font-bold">{weather.wind.speed} m/s</p>
-              </div>
-              <div className="bg-white/20 backdrop-blur-md border border-white/20 rounded-2xl p-4 flex flex-col items-center col-span-2 shadow-lg">
-                <Sun className="w-6 h-6 mb-2 text-yellow-200" />
-                <p className="text-sm text-white/80">Feels Like</p>
-                <p className="text-lg font-bold">{Math.round(weather.main.feels_like)}°C</p>
+              <div className="rise flex items-start -ml-1 sm:-ml-3 mt-2 select-none">
+                <span
+                  className="font-extrabold tracking-tighter leading-[0.85]"
+                  style={{ fontSize: 'clamp(9rem, 32vw, 24rem)' }}
+                >
+                  {Math.round(weather.main.temp)}
+                </span>
+                <span className="font-bold mt-3 sm:mt-8" style={{ fontSize: 'clamp(2rem, 7vw, 5rem)' }}>
+                  °C
+                </span>
               </div>
             </div>
+          )}
+
+          {!weather && !loading && !error && (
+            <div>
+              <h1 className="font-extrabold tracking-tight leading-[0.9]" style={{ fontSize: 'clamp(3rem, 10vw, 8rem)' }}>
+                Which city?
+              </h1>
+              <p className="mt-4 text-xl font-semibold opacity-70 max-w-sm">
+                The whole screen changes colour with the weather.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        {weather && !loading && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-6">
+            <Stat label="Humidity" value={`${weather.main.humidity}%`} />
+            <Stat label="Wind" value={`${weather.wind.speed} m/s`} />
+            <Stat label="Feels like" value={`${Math.round(weather.main.feels_like)}°C`} />
+            {weather.main.pressure !== undefined && (
+              <Stat label="Pressure" value={`${weather.main.pressure} hPa`} />
+            )}
           </div>
         )}
-
-        {!weather && !loading && !error && (
-          <div className="flex flex-col items-center justify-center py-10 opacity-70">
-            <Cloud className="w-16 h-16 mb-4 drop-shadow-lg" />
-            <p className="text-lg font-medium">Search a city to see the weather</p>
-          </div>
-        )}
-
       </div>
-    </div>
+    </main>
   );
 }
 
