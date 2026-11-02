@@ -62,6 +62,32 @@ app.get('/api/forecast', async (req, res) => {
   }
 });
 
+// Reverse Geocoding Route (Lat/Lon se City nikalne ke liye)
+app.get('/api/location', async (req, res) => {
+  try {
+    const { lat, lon } = req.query;
+
+    if (!lat || !lon) {
+      return res.status(400).json({ message: 'Latitude and Longitude are required' });
+    }
+
+    const apiKey = process.env.WEATHER_API_KEY;
+
+    const response = await axios.get(
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`
+    );
+
+    if (response.data.length === 0) {
+      return res.status(404).json({ message: 'Location not found' });
+    }
+
+    // API array return karti hai, humein pehla element chahiye
+    res.status(200).json({ city: response.data[0].name });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Server start karo
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
