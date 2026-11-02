@@ -1,95 +1,48 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Loader2 } from 'lucide-react';
+import {
+  Sun, Cloud, CloudRain, CloudDrizzle, CloudSnow, CloudLightning,
+  CloudFog, CloudSun, Droplets, Wind, Thermometer, Gauge, Loader2
+} from 'lucide-react';
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+} from 'recharts';
 
-/*
-  Design idea: the whole screen is a flat colour-block poster.
-  Each weather condition gets its own solid colour, ink colour and one bold
-  geometric shape (sun = circle, rain = striped arch, thunder = bolt, etc).
-  No cards, no gradients, no glass. The temperature is the hero.
-*/
 const THEMES = {
-  idle:         { bg: '#EDEDED', ink: '#000000', accent: '#000000', shape: 'ring' },
-  Clear:        { bg: '#FFC933', ink: '#000000', accent: '#FF5A36', shape: 'sun' },
-  Clouds:       { bg: '#AFC3D6', ink: '#000000', accent: '#F5F8FB', shape: 'clouds' },
-  Rain:         { bg: '#7FB2FF', ink: '#000000', accent: '#1E4BD6', shape: 'rain' },
-  Thunderstorm: { bg: '#B79CFF', ink: '#000000', accent: '#FFE14D', shape: 'bolt' },
-  Snow:         { bg: '#DCEBF2', ink: '#000000', accent: '#6FB3E0', shape: 'snow' },
-  Mist:         { bg: '#B9B4A8', ink: '#000000', accent: '#E8E4D8', shape: 'mist' },
+  idle:         { bg: '#EDEDED', accent: '#FFFFFF', Icon: CloudSun, chartColor: '#888888' },
+  Clear:        { bg: '#FFC933', accent: '#FF8A3D', Icon: Sun, chartColor: '#D97706' },
+  Clouds:       { bg: '#AFC3D6', accent: '#F5F8FB', Icon: Cloud, chartColor: '#64748B' },
+  Rain:         { bg: '#7FB2FF', accent: '#E4EFFF', Icon: CloudRain, chartColor: '#3B82F6' },
+  Drizzle:      { bg: '#7FB2FF', accent: '#E4EFFF', Icon: CloudDrizzle, chartColor: '#3B82F6' },
+  Thunderstorm: { bg: '#B79CFF', accent: '#FFE14D', Icon: CloudLightning, chartColor: '#7C3AED' },
+  Snow:         { bg: '#DCEBF2', accent: '#FFFFFF', Icon: CloudSnow, chartColor: '#60A5FA' },
+  Mist:         { bg: '#B9B4A8', accent: '#E8E4D8', Icon: CloudFog, chartColor: '#78716C' },
 };
-THEMES.Drizzle = THEMES.Rain;
 ['Haze', 'Fog', 'Smoke', 'Dust', 'Sand', 'Ash'].forEach((k) => (THEMES[k] = THEMES.Mist));
 
-function Shape({ kind, accent }) {
-  const fill = { width: '100%', height: '100%' };
-
-  if (kind === 'sun') {
-    return <div style={{ ...fill, borderRadius: '50%', background: accent }} />;
-  }
-  if (kind === 'clouds') {
-    const blob = (style) => <div style={{ position: 'absolute', borderRadius: '50%', background: accent, ...style }} />;
-    return (
-      <div style={{ ...fill, position: 'relative' }}>
-        {blob({ width: '55%', height: '55%', left: 0, top: '42%' })}
-        {blob({ width: '72%', height: '72%', left: '20%', top: '8%' })}
-        {blob({ width: '50%', height: '50%', left: '50%', top: '48%' })}
+function Badge({ theme }) {
+  const { Icon, accent } = theme;
+  return (
+    // FIX: z-0 diya (taaki content z-10 ke peeche rahe) aur position center mein fix ki hai
+    <div aria-hidden="true" className="pointer-events-none absolute z-0 right-[5vw] top-[10vh] sm:top-1/2 sm:-translate-y-1/2 w-[35vmin] h-[35vmin] sm:w-[45vmin] sm:h-[45vmin] opacity-90">
+      <div className="absolute rounded-full border-[1.5px] border-black" style={{ inset: '-7%' }} />
+      <div className="w-full h-full rounded-full flex items-center justify-center transition-colors duration-700" style={{ background: accent }}>
+        <div style={{ width: '55%', height: '55%' }}>
+          <Icon size="100%" strokeWidth={1} color="#000" />
+        </div>
       </div>
-    );
-  }
-  if (kind === 'rain') {
-    return (
-      <div
-        style={{
-          ...fill,
-          borderRadius: '50% 50% 0 0 / 40% 40% 0 0',
-          backgroundImage: `repeating-linear-gradient(110deg, ${accent} 0 10px, transparent 10px 30px)`,
-        }}
-      />
-    );
-  }
-  if (kind === 'bolt') {
-    return (
-      <div
-        style={{
-          ...fill,
-          background: accent,
-          clipPath: 'polygon(55% 0, 15% 55%, 45% 55%, 30% 100%, 85% 38%, 52% 38%)',
-        }}
-      />
-    );
-  }
-  if (kind === 'snow') {
-    return (
-      <div
-        style={{
-          ...fill,
-          borderRadius: '50%',
-          backgroundImage: `radial-gradient(circle, ${accent} 5px, transparent 6px)`,
-          backgroundSize: '36px 36px',
-        }}
-      />
-    );
-  }
-  if (kind === 'mist') {
-    return (
-      <div
-        style={{
-          ...fill,
-          borderRadius: '50%',
-          backgroundImage: `repeating-linear-gradient(0deg, ${accent} 0 12px, transparent 12px 28px)`,
-        }}
-      />
-    );
-  }
-  // idle
-  return <div style={{ ...fill, borderRadius: '50%', border: `12px solid ${accent}`, opacity: 0.9 }} />;
+    </div>
+  );
 }
 
-function Stat({ label, value }) {
+function Stat({ icon: Icon, label, value }) {
   return (
-    <div className="border-t-4 border-current pt-3">
-      <p className="text-sm font-semibold opacity-70">{label}</p>
-      <p className="text-3xl sm:text-4xl font-extrabold tracking-tight">{value}</p>
+    <div className="border-t-2 border-black pt-2">
+      <div className="flex items-center gap-1.5 opacity-80">
+        <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+        <p className="text-xs font-semibold">{label}</p>
+      </div>
+      <p className="mt-1 text-xl sm:text-2xl font-bold tracking-tight">{value}</p>
     </div>
   );
 }
@@ -97,6 +50,7 @@ function Stat({ label, value }) {
 function App() {
   const [city, setCity] = useState('');
   const [weather, setWeather] = useState(null);
+  const [forecast, setForecast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -108,12 +62,24 @@ function App() {
     setLoading(true);
     setError('');
     setWeather(null);
+    setForecast(null);
 
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/weather?city=${encodeURIComponent(query)}`
-      );
-      setWeather(response.data);
+      const [weatherRes, forecastRes] = await Promise.all([
+        axios.get(`http://localhost:5000/api/weather?city=${encodeURIComponent(query)}`),
+        axios.get(`http://localhost:5000/api/forecast?city=${encodeURIComponent(query)}`)
+      ]);
+
+      setWeather(weatherRes.data);
+      
+      const formattedForecast = forecastRes.data.list
+        .filter((_, index) => index % 8 === 0)
+        .map(item => ({
+          time: new Date(item.dt * 1000).toLocaleDateString('en-US', { weekday: 'short' }),
+          temp: Math.round(item.main.temp)
+        }));
+
+      setForecast(formattedForecast);
     } catch (err) {
       if (err.response && err.response.status === 404) {
         setError('City not found. Please check the spelling.');
@@ -126,87 +92,70 @@ function App() {
   };
 
   const condition = weather?.weather?.[0]?.main;
-  const t = weather ? THEMES[condition] || THEMES.Clouds : THEMES.idle;
+  const theme = weather ? THEMES[condition] || THEMES.Clouds : THEMES.idle;
 
   return (
-    <main
-      className="poster relative min-h-screen overflow-hidden transition-colors duration-700"
-      style={{ background: t.bg, color: t.ink }}
-    >
+    <main className="poster relative min-h-screen overflow-hidden text-black transition-colors duration-700" style={{ background: theme.bg }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap');
         .poster { font-family: 'Bricolage Grotesque', system-ui, -apple-system, 'Segoe UI', sans-serif; }
-        .poster input::placeholder { color: currentColor; opacity: .45; }
-        .poster input:focus, .poster input:focus-visible { outline: none; box-shadow: 0 4px 0 0 currentColor; }
-        .poster button:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
-        @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        .poster input::placeholder { color: #000; opacity: .45; }
+        .poster input:focus, .poster input:focus-visible { outline: none; box-shadow: 0 4px 0 0 #000; }
+        .poster button:focus-visible { outline: 3px solid #000; outline-offset: 4px; }
+        @keyframes rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .rise { animation: rise .6s cubic-bezier(.2,.7,.2,1) both; }
         @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
       `}</style>
 
-      {/* Big geometric shape that follows the weather */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-[14vmin] top-[10vh] w-[72vmin] h-[72vmin]"
-      >
-        <Shape kind={t.shape} accent={t.accent} />
-      </div>
+      {/* Yahan main content ke peeche rakhne ke liye z-0 diya hai */}
+      <Badge theme={theme} />
 
-      <div className="relative z-10 flex flex-col min-h-screen max-w-6xl mx-auto w-full px-6 sm:px-10 py-8">
-        {/* Search */}
-        <form onSubmit={fetchWeather} className="flex items-end gap-3 w-full max-w-xl">
+      <div className="relative z-10 flex flex-col min-h-screen max-w-5xl mx-auto w-full px-6 sm:px-10 py-6">
+        <form onSubmit={fetchWeather} className="flex items-end gap-3 w-full max-w-md">
           <input
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}
             placeholder="Type a city"
             aria-label="City name"
-            className="flex-1 min-w-0 bg-transparent border-b-4 border-current py-2 text-2xl sm:text-3xl font-bold focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent border-b-2 border-black py-1.5 text-xl sm:text-2xl font-bold"
           />
-          <button
-            type="submit"
-            className="px-5 py-3 font-bold text-lg active:scale-95 transition-transform"
-            style={{ background: t.ink, color: t.bg }}
-          >
+          <button type="submit" className="px-4 py-2 font-bold text-base bg-black text-white active:scale-95 transition-transform">
             Search
           </button>
         </form>
 
-        {/* Main area */}
-        <div className="flex-1 flex flex-col justify-center py-10">
+        <div className="flex-1 flex flex-col justify-center py-6">
           {loading && (
-            <div className="flex items-center gap-4" role="status">
-              <Loader2 className="w-10 h-10 animate-spin" />
-              <p className="text-3xl font-bold">Fetching weather...</p>
+            <div className="flex items-center gap-3" role="status">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <p className="text-2xl font-bold">Fetching weather...</p>
             </div>
           )}
 
           {error && !loading && (
             <div role="alert">
-              <h1 className="font-extrabold tracking-tight leading-none" style={{ fontSize: 'clamp(3rem, 9vw, 7rem)' }}>
+              <h1 className="font-bold tracking-tight leading-none" style={{ fontSize: 'clamp(2.5rem, 6vw, 4.5rem)' }}>
                 No luck.
               </h1>
-              <p className="mt-4 text-2xl font-semibold max-w-md">{error}</p>
+              <p className="mt-2 text-xl font-semibold max-w-md">{error}</p>
             </div>
           )}
 
           {weather && !loading && (
             <div>
-              <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                 {weather.name}, {weather.sys.country}
               </h1>
-              <p className="mt-1 text-xl sm:text-2xl font-semibold capitalize opacity-80">
+              <p className="mt-0.5 text-base sm:text-lg font-semibold capitalize opacity-70">
                 {weather.weather[0].description}
               </p>
 
-              <div className="rise flex items-start -ml-1 sm:-ml-3 mt-2 select-none">
-                <span
-                  className="font-extrabold tracking-tighter leading-[0.85]"
-                  style={{ fontSize: 'clamp(9rem, 32vw, 24rem)' }}
-                >
+              <div className="rise flex items-start mt-2 select-none">
+                <span className="font-bold leading-none" style={{ fontSize: 'clamp(5rem, 15vw, 10rem)', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
                   {Math.round(weather.main.temp)}
                 </span>
-                <span className="font-bold mt-3 sm:mt-8" style={{ fontSize: 'clamp(2rem, 7vw, 5rem)' }}>
+                <span className="font-semibold ml-2 sm:ml-3 mt-1 sm:mt-3" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.5rem)' }}>
                   °C
                 </span>
               </div>
@@ -215,24 +164,52 @@ function App() {
 
           {!weather && !loading && !error && (
             <div>
-              <h1 className="font-extrabold tracking-tight leading-[0.9]" style={{ fontSize: 'clamp(3rem, 10vw, 8rem)' }}>
+              <h1 className="font-bold tracking-tight leading-[0.95]" style={{ fontSize: 'clamp(2.5rem, 7vw, 5rem)' }}>
                 Which city?
               </h1>
-              <p className="mt-4 text-xl font-semibold opacity-70 max-w-sm">
+              <p className="mt-2 text-lg font-semibold opacity-70 max-w-sm">
                 The whole screen changes colour with the weather.
               </p>
             </div>
           )}
         </div>
 
-        {/* Stats */}
+        {/* Forecast Graph */}
+        {forecast && weather && !loading && (
+          <div className="mt-2 mb-6 bg-white/30 backdrop-blur-md border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <h2 className="text-sm sm:text-base font-bold mb-2 uppercase tracking-widest">5-Day Forecast</h2>
+            <div className="w-full h-48 sm:h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={forecast} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.2)" vertical={false} />
+                  <XAxis dataKey="time" stroke="#000" tick={{ fill: '#000', fontWeight: 'bold', fontSize: 12, fontFamily: 'Bricolage Grotesque' }} axisLine={false} tickLine={false} />
+                  <YAxis stroke="#000" tick={{ fill: '#000', fontWeight: 'bold', fontSize: 12, fontFamily: 'Bricolage Grotesque' }} axisLine={false} tickLine={false} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', border: '2px solid #000', fontWeight: 'bold', fontSize: '12px', fontFamily: 'Bricolage Grotesque' }}
+                    itemStyle={{ color: '#000' }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="temp" 
+                    stroke="#000" 
+                    strokeWidth={2.5} 
+                    fill={theme.chartColor} 
+                    fillOpacity={0.5} 
+                    animationDuration={1000}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
         {weather && !loading && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-6">
-            <Stat label="Humidity" value={`${weather.main.humidity}%`} />
-            <Stat label="Wind" value={`${weather.wind.speed} m/s`} />
-            <Stat label="Feels like" value={`${Math.round(weather.main.feels_like)}°C`} />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-4">
+            <Stat icon={Droplets} label="Humidity" value={`${weather.main.humidity}%`} />
+            <Stat icon={Wind} label="Wind" value={`${weather.wind.speed} m/s`} />
+            <Stat icon={Thermometer} label="Feels like" value={`${Math.round(weather.main.feels_like)}°C`} />
             {weather.main.pressure !== undefined && (
-              <Stat label="Pressure" value={`${weather.main.pressure} hPa`} />
+              <Stat icon={Gauge} label="Pressure" value={`${weather.main.pressure} hPa`} />
             )}
           </div>
         )}
